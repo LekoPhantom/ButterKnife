@@ -2,6 +2,33 @@
 
 ## Troubleshooting and Improvements
 
+### Pin Reorganization for Better Breadboard Layout
+**Change**: Reorganized pin assignments for easier breadboard wiring
+**Reason**: To allow using a single header strip next to the Pico
+**New Pin Assignments**:
+```cpp
+// Encoder and Buttons
+#define ENCODER_A_PIN 9     // GP9 on the Pico
+#define ENCODER_B_PIN 10    // GP10 on the Pico
+#define ENCODER_BUTTON_PIN 11 // GP11 on the Pico
+#define BUTTON1_PIN 21     // GP21 on the Pico
+#define BUTTON2_PIN 20     // GP20 on the Pico
+#define BUTTON3_PIN 19     // GP19 on the Pico
+```
+
+### Display Initialization Fix
+**Issue**: Display not initializing due to I2C pin conflict
+**Problem**: Encoder and button pins were overlapping with I2C pins (GP0-GP1)
+**Fix**: Moved encoder and button pins to non-I2C pins:
+```cpp
+#define ENCODER_A_PIN 9   // GP1 on the Pico
+#define ENCODER_B_PIN 10    // GP2 on the Pico
+#define ENCODER_BUTTON_PIN 11  // GP3 on the Pico
+#define BUTTON1_PIN 18     // GP10 on the Pico
+#define BUTTON2_PIN 19     // GP6 on the Pico
+#define BUTTON3_PIN 20     // GP7 on the Pico
+```
+
 ### Initial Issue: Software Lockups
 **User**: "I am noticing there are some times when the software locks up. I am wondering if you could help me troubleshoot it. I know it happens when the encoder is spun (possibly too fast)? I did notice a few delays. I was wondering if that is messing with the interrupt. Is the filter another possibility?"
 

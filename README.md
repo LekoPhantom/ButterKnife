@@ -2,6 +2,35 @@
 
 A test bed interface for the Raspberry Pi Pico with oscilloscope, settings, and button test functionality.
 
+## Pin Assignments
+```cpp
+// Encoder and Buttons
+#define ENCODER_A_PIN 9     // GP9 on the Pico
+#define ENCODER_B_PIN 10    // GP10 on the Pico
+#define ENCODER_BUTTON_PIN 11 // GP11 on the Pico
+#define BUTTON1_PIN 21     // GP21 on the Pico
+#define BUTTON2_PIN 20     // GP20 on the Pico
+#define BUTTON3_PIN 19     // GP19 on the Pico
+#define BUTTON4_PIN 18     // GP18 on the Pico
+
+// Analog Inputs
+#define ANALOG_IN 26       // ADC0 (GP26)
+#define ANALOG_IN2 27      // ADC1 (GP27)
+```
+
+### Important Pin Notes
+- I2C pins (GP0-GP1) are reserved for the OLED display
+- Avoid using GP0-GP1 for other functions
+- All other GPIO pins can be used for buttons and encoder
+
+### Potentiometer Wiring
+For testing analog input with a potentiometer:
+```
+3.3V ──┬── Potentiometer ──┬── GND
+       │                   │
+       └── Wiper ──────────└── GP26 (ADC0)
+```
+
 ## Recent Improvements
 
 ### Button Test Mode Fix
@@ -23,19 +52,6 @@ display.print(F("Press encoder to exit"));
 - Improved encoder responsiveness by reducing rate limiting from 10ms to 5ms
 - Added proper debouncing for all buttons
 - Fixed state management to prevent unwanted returns to main menu
-
-### Pin Assignments
-Current pin assignments for the Raspberry Pi Pico:
-```cpp
-#define ENCODER_A_PIN 2    // GP2 on the Pico
-#define ENCODER_B_PIN 3    // GP3 on the Pico
-#define ENCODER_BUTTON_PIN 4  // GP4 on the Pico
-#define BUTTON1_PIN 5      // GP5 on the Pico
-#define BUTTON2_PIN 6      // GP6 on the Pico
-#define BUTTON3_PIN 7      // GP7 on the Pico
-#define ANALOG_IN 26       // ADC0
-#define ANALOG_IN2 27      // ADC1
-```
 
 ### Key Features
 - Oscilloscope mode with dual channel support

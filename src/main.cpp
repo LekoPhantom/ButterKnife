@@ -3,6 +3,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <RotaryEncoder.h>
+//#include <EEPROM.h>
 
 // Display settings
 #define SCREEN_WIDTH 128
@@ -10,13 +11,22 @@
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
 
+// EEPROM settings
+#define EEPROM_SIZE 512
+#define SETTINGS_VERSION 1
+#define SETTINGS_START_ADDRESS 0
+#define SETTINGS_SAVE_DELAY 5000  // Save settings after 5 seconds of no changes
+#define WRITE_CYCLES_ADDRESS 100  // Store write cycle count at a different address
+#define MAX_WRITE_CYCLES 100000   // Maximum recommended write cycles
+
 // Pin definitions
-#define ENCODER_A_PIN 2    // GP2 on the Pico
-#define ENCODER_B_PIN 3    // GP3 on the Pico
-#define ENCODER_BUTTON_PIN 4  // GP4 on the Pico
-#define BUTTON1_PIN 5      // GP5 on the Pico
-#define BUTTON2_PIN 6      // GP6 on the Pico
-#define BUTTON3_PIN 7      // GP7 on the Pico
+#define ENCODER_A_PIN 9    // GP2 on the Pico
+#define ENCODER_B_PIN 10    // GP3 on the Pico
+#define ENCODER_BUTTON_PIN 11 // GP4 on the Pico
+#define BUTTON1_PIN 21    // GP5 on the Pico
+#define BUTTON2_PIN 20     // GP6 on the Pico
+#define BUTTON3_PIN 19     // GP7 on the Pico
+#define BUTTON4_PIN 18     // GP18 on the Pico
 #define ANALOG_IN 26       // ADC0
 #define ANALOG_IN2 27      // ADC1
 
@@ -52,13 +62,15 @@ struct ScopeSettings {
     bool triggerEnabled;
     bool showChannel2;  // Whether to show second channel
     int channel2Offset; // Vertical offset for channel 2
+    bool settingsPersistence; // Whether to save settings to EEPROM
 } scopeSettings = {
     .timeScale = 1,     // 1ms per division
     .voltageScale = 100,// 100 units per division
     .triggerLevel = 512,// Middle of range
     .triggerEnabled = false,
     .showChannel2 = false,
-    .channel2Offset = 20 // Pixels offset for channel 2
+    .channel2Offset = 20, // Pixels offset for channel 2
+    .settingsPersistence = true // Enable persistence by default
 };
 
 // Function declarations
@@ -71,42 +83,122 @@ void updateOscilloscope();
 void updateSettings();
 void updateButtonTest();
 
+// Function to save settings to EEPROM
+void saveSettings() {
+    static unsigned long lastSaveTime = 0;
+    static bool settingsChanged = false;
+    
+    // Don't save if persistence is disabled
+    if (!scopeSettings.settingsPersistence) {
+        return;
+    }
+    
+    // Only save if settings have changed and enough time has passed
+    if (settingsChanged && (millis() - lastSaveTime >= SETTINGS_SAVE_DELAY)) {
+        // Read current write cycle count
+        unsigned long writeCycles;
+        //EEPROM.get(WRITE_CYCLES_ADDRESS, writeCycles);
+        writeCycles++;
+        
+        // Check if we're approaching the limit
+        if (writeCycles > MAX_WRITE_CYCLES * 0.9) { // 90% of max
+            Serial.println(F("WARNING: Approaching EEPROM write cycle limit!"));
+        }
+        
+        // Save settings and update write cycle count
+        //EEPROM.put(SETTINGS_START_ADDRESS, SETTINGS_VERSION);
+        //EEPROM.put(SETTINGS_START_ADDRESS + sizeof(SETTINGS_VERSION), scopeSettings);
+        //EEPROM.put(WRITE_CYCLES_ADDRESS, writeCycles);
+        //EEPROM.commit();
+        
+        Serial.print(F("Settings saved to EEPROM. Write cycles: "));
+        Serial.println(writeCycles);
+        
+        lastSaveTime = millis();
+        settingsChanged = false;
+    }
+}
+
+// Function to mark settings as changed
+void markSettingsChanged() {
+    static unsigned long lastChangeTime = 0;
+    static bool settingsChanged = false;
+    
+    settingsChanged = true;
+    lastChangeTime = millis();
+}
+
 void setup() {
     // Initialize Serial but don't wait for it
     Serial.begin(115200);
+    Serial.println(F("Starting setup..."));
+    
+    // Initialize EEPROM
+    //EEPROM.begin(EEPROM_SIZE);
+    Serial.println(F("EEPROM initialized"));
+    
+    // Try to load settings
+   // if (!loadSettings()) {
+   //     Serial.println(F("Using default settings"));
+   // }
     
     // Initialize I2C for Pico
     Wire.begin();
+    Serial.println(F("I2C initialized"));
+    
+    // Give the display time to power up
+    delay(100);
+    Serial.println(F("Checking for display at address 0x3C..."));
     
     // Try to initialize the display
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        // If display fails, just keep trying
-        for(;;) {
-            if(display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-                break;
+        Serial.println(F("First display init failed, retrying..."));
+        // If display fails, try again with a delay
+        delay(100);
+        if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+            Serial.println(F("Second display init failed, entering retry loop..."));
+            // If still fails, keep trying with delays
+            for(;;) {
+                delay(100);
+                if(display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+                    Serial.println(F("Display initialized in retry loop"));
+                    break;
+                }
+                Serial.println(F("Display init failed, retrying..."));
             }
+        } else {
+            Serial.println(F("Display initialized on second attempt"));
         }
+    } else {
+        Serial.println(F("Display initialized on first attempt"));
     }
     
     // Additional display configuration
+    Serial.println(F("Configuring display..."));
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setRotation(0);
     display.display();
+    Serial.println(F("Display configured"));
     
     // Initialize pins
+    Serial.println(F("Initializing pins..."));
     pinMode(ENCODER_A_PIN, INPUT_PULLUP);
     pinMode(ENCODER_B_PIN, INPUT_PULLUP);
     pinMode(ENCODER_BUTTON_PIN, INPUT_PULLUP);
     pinMode(BUTTON1_PIN, INPUT_PULLUP);
     pinMode(BUTTON2_PIN, INPUT_PULLUP);
     pinMode(BUTTON3_PIN, INPUT_PULLUP);
+    pinMode(BUTTON4_PIN, INPUT_PULLUP);
     pinMode(ANALOG_IN, INPUT);
     pinMode(ANALOG_IN2, INPUT);
+    Serial.println(F("Pins initialized"));
     
     // Initial display
+    Serial.println(F("Displaying main menu..."));
     displayMainMenu();
+    Serial.println(F("Setup complete"));
 }
 
 void loop() {
@@ -120,6 +212,9 @@ void loop() {
     
     // Check buttons
     checkButtons();
+    
+    // Try to save settings if they've changed
+    saveSettings();
     
     // Debug output every second
     if (millis() - lastDebugTime > 1000) {
@@ -276,9 +371,9 @@ void handleEncoderChange() {
             case SETTINGS_MODE:
                 // First handle selection
                 if (direction > 0) {
-                    encoderValue = (encoderValue + 1) % 6;  // Now 6 settings
+                    encoderValue = (encoderValue + 1) % 7;  // Now 7 settings
                 } else {
-                    encoderValue = (encoderValue + 5) % 6;  // Move backward
+                    encoderValue = (encoderValue + 6) % 7;  // Move backward
                 }
                 
                 // Then handle value changes with rate limiting
@@ -305,6 +400,16 @@ void handleEncoderChange() {
                     case 5: // Channel 2 offset
                         scopeSettings.channel2Offset = max(0, min(40, scopeSettings.channel2Offset + direction));
                         break;
+                    case 6: // Settings persistence
+                        if (direction != 0) {  // Only toggle on actual movement
+                            scopeSettings.settingsPersistence = !scopeSettings.settingsPersistence;
+                            if (!scopeSettings.settingsPersistence) {
+                                Serial.println(F("Settings persistence disabled"));
+                            } else {
+                                Serial.println(F("Settings persistence enabled"));
+                            }
+                        }
+                        break;
                 }
                 updateSettings();
                 break;
@@ -319,6 +424,11 @@ void handleEncoderChange() {
             case BUTTON_TEST_MODE:
                 // No encoder action in button test mode
                 break;
+        }
+        
+        // Mark settings as changed when they're modified
+        if (currentState == SETTINGS_MODE) {
+            markSettingsChanged();
         }
     }
 }
@@ -388,7 +498,8 @@ void checkButtons() {
     
     bool currentButtonState = (digitalRead(BUTTON1_PIN) == LOW || 
                              digitalRead(BUTTON2_PIN) == LOW || 
-                             digitalRead(BUTTON3_PIN) == LOW);
+                             digitalRead(BUTTON3_PIN) == LOW ||
+                             digitalRead(BUTTON4_PIN) == LOW);
     
     // Check if the button state has changed
     if (currentButtonState != lastButtonState) {
@@ -527,6 +638,10 @@ void updateSettings() {
     display.print(scopeSettings.channel2Offset);
     display.println(F("px"));
     
+    display.print(encoderValue == 6 ? F(">") : F(" "));
+    display.print(F("Save: "));
+    display.println(scopeSettings.settingsPersistence ? F("ON") : F("OFF"));
+    
     // Add back to menu message at the bottom
     display.setCursor(0, 56);
     display.print(F("Press any button to menu"));
@@ -565,9 +680,30 @@ void updateButtonTest() {
     display.print(BUTTON3_PIN);
     display.println(F(")"));
     
+    display.print(F("Button 4: "));
+    display.print(digitalRead(BUTTON4_PIN) ? F("UP") : F("DOWN"));
+    display.print(F(" (Pin "));
+    display.print(BUTTON4_PIN);
+    display.println(F(")"));
+    
     // Add back to menu message
     display.setCursor(0, 56);
     display.print(F("Press encoder to exit"));
     
     display.display();
-} 
+}
+/*
+// Function to load settings from EEPROM
+bool loadSettings() {
+    int version;
+   // EEPROM.get(SETTINGS_START_ADDRESS, version);
+    
+    if (version == SETTINGS_VERSION) {
+        EEPROM.get(SETTINGS_START_ADDRESS + sizeof(version), scopeSettings);
+        Serial.println(F("Settings loaded from EEPROM"));
+        return true;
+    }
+    
+    Serial.println(F("No valid settings found in EEPROM"));
+    return false;
+} */
